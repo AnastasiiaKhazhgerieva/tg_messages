@@ -1,4 +1,3 @@
-```python
 import os
 import requests
 
@@ -31,4 +30,3 @@ if not result.get("ok"):
 
 print("Poll sent successfully")
 print(result)
-```
