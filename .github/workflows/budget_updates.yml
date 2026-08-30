@@ -1,0 +1,31 @@
+name: Budget updates
+
+on:
+  schedule:
+    # Каждый день в 06:30 по Москве = 03:30 UTC
+    - cron: "30 3 * * *"
+
+  # Возможность запустить вручную для теста
+  workflow_dispatch:
+
+jobs:
+  send-budget-updates:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Send budget updates
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          BUDGET_UPDATES_CHAT_ID: ${{ secrets.BUDGET_UPDATES_CHAT_ID }}
+        run: python send_budget_updates.py
