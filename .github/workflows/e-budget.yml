@@ -1,0 +1,31 @@
+name: E-budget
+
+on:
+  schedule:
+    # Каждый день в 06:00 по Москве = 03:00 UTC
+    - cron: "0 3 * * *"
+
+  # Возможность запустить вручную для теста
+  workflow_dispatch:
+
+jobs:
+  send-e-budget:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Send federal budget
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          E_BUDGET_CHAT_ID: ${{ secrets.E_BUDGET_CHAT_ID }}
+        run: python send_e_budget.py
