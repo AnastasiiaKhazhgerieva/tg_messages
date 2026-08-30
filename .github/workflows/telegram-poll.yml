@@ -1,16 +1,22 @@
 
-name: Send Telegram poll
+name: Send Telegram polls
 
 on:
   schedule:
-    # Воскресенье–четверг, 18:00 по Москве (15:00 UTC)
+    # Основной опрос: воскресенье–четверг, 18:00 МСК (15:00 UTC)
     - cron: "0 15 * * 0-4"
 
-  # Возможность запустить вручную для теста
+    # Новостной опрос: понедельник, 10:00 МСК (07:00 UTC)
+    - cron: "0 7 * * 1"
+
+  # Возможность запустить workflow вручную
   workflow_dispatch:
 
 jobs:
-  send-poll:
+  send-office-poll:
+    # Этот job запускается только по расписанию основного опроса
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 15 * * 0-4'
+
     runs-on: ubuntu-latest
 
     steps:
@@ -25,9 +31,32 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Send Telegram poll
+      - name: Send office poll
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python send_poll.py
 
+  send-news-poll:
+    # Этот job запускается только по расписанию новостного опроса
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 7 * * 1'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Send news poll
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          NEWS_CHAT_ID: ${{ secrets.NEWS_CHAT_ID }}
+        run: python send_news_poll.py
