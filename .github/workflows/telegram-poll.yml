@@ -1,4 +1,3 @@
-```yaml
 name: Send Telegram poll
 
 on:
@@ -58,4 +57,3 @@ jobs:
               check=True,
           )
           PY
-```
