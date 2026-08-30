@@ -1,0 +1,61 @@
+```yaml
+name: Send Telegram poll
+
+on:
+  schedule:
+    # Запускаемся каждый час с воскресенья по четверг.
+    # Python ниже проверяет московское время.
+    - cron: "0 * * * 0-4"
+
+  workflow_dispatch:
+
+jobs:
+  send-poll:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Check time and send poll
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python - <<'PY'
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          import subprocess
+          import sys
+
+          now = datetime.now(ZoneInfo("Europe/Moscow"))
+
+          print(f"Current Moscow time: {now}")
+
+          # Пн=0, Вт=1, Ср=2, Чт=3, Пт=4, Сб=5, Вс=6
+          # Нужны: воскресенье, понедельник, вторник, среда, четверг.
+          allowed_days = {0, 1, 2, 3, 6}
+
+          if now.weekday() not in allowed_days:
+              print("Today is not an allowed day. Exiting.")
+              sys.exit(0)
+
+          # Отправляем в 18:00 по Москве.
+          if now.hour != 18:
+              print("Not 18:00 Moscow time. Exiting.")
+              sys.exit(0)
+
+          subprocess.run(
+              [sys.executable, "send_poll.py"],
+              check=True,
+          )
+          PY
+```
