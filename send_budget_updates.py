@@ -1,5 +1,7 @@
 import os
+from html import escape
 from io import BytesIO
+from urllib.parse import urljoin
 
 import requests
 from openpyxl import load_workbook
@@ -8,19 +10,17 @@ from openpyxl import load_workbook
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHAT_ID = os.environ["BUDGET_UPDATES_CHAT_ID"]
 
-TXT_URL = "http://45.8.250.108/budget_updates.txt"
-XLSX_URL = "http://45.8.250.108/main_routine_tg_msg.xlsx"
+PUBLIC_BASE_URL = os.environ.get("BUDGET_PUBLIC_BASE_URL", "http://45.8.250.108/").rstrip("/") + "/"
+TXT_URL = os.environ.get("BUDGET_UPDATES_TXT_URL", urljoin(PUBLIC_BASE_URL, "budget_updates.txt"))
+XLSX_URL = os.environ.get("BUDGET_FLAGS_XLSX_URL", urljoin(PUBLIC_BASE_URL, "main_routine_tg_msg.xlsx"))
 
 TELEGRAM_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
 
 def read_text_file():
-    """Скачивает и читает текстовый файл."""
+    """Скачивает и читает текстовый файл с сообщением от budget_updates.py."""
     response = requests.get(TXT_URL, timeout=30)
     response.raise_for_status()
-
-    # utf-8 — ожидаемая кодировка русского текста.
-    # errors="strict" позволит сразу заметить проблему с кодировкой.
     return response.content.decode("utf-8")
 
 
@@ -35,16 +35,13 @@ def read_flags():
     )
 
     sheet = workbook.active
-
-    # Первая строка — названия столбцов.
     headers = [cell.value for cell in sheet[1]]
-
-    # Вторая строка — значения 0/1.
     values = [cell.value for cell in sheet[2]]
 
     data = {
         str(header).strip(): value
         for header, value in zip(headers, values)
+        if header is not None
     }
 
     return {
@@ -54,34 +51,39 @@ def read_flags():
     }
 
 
+def html_link(label, url):
+    return f'<a href="{escape(url, quote=True)}">{escape(label)}</a>'
+
+
 def build_message(text, flags):
-    """Формирует итоговое сообщение."""
+    """Формирует итоговое Telegram-сообщение."""
     additions = []
 
     if flags["dash"]:
         additions.append(
-            "[Dashboard](http://45.8.250.108/index.html) обновлен."
+            f"{html_link('Dashboard', urljoin(PUBLIC_BASE_URL, 'index.html'))} обновлен."
         )
 
     if flags["slides"]:
         additions.append(
             "Обновлены слайды: для "
-            "[дэшборда](http://45.8.250.108/Budget_dashboard_upd.pptx) "
+            f"{html_link('дэшборда', urljoin(PUBLIC_BASE_URL, 'Budget_dashboard_upd.pptx'))} "
             "и для "
-            "[ОПР](http://45.8.250.108/Budget_routine_upd.pptx)."
+            f"{html_link('ОПР', urljoin(PUBLIC_BASE_URL, 'Budget_routine_upd.pptx'))}."
         )
 
     if flags["katya"]:
         additions.append(
             "Обновил файл для "
-            "[Кати Петреневой]"
-            "(http://45.8.250.108/e_r_rollsums_for_Katya.xlsx)."
+            f"{html_link('Кати Петреневой', urljoin(PUBLIC_BASE_URL, 'e_r_rollsums_for_Katya.xlsx'))}."
         )
 
-    if additions:
-        return text.rstrip() + "\n\n" + "\n".join(additions)
+    escaped_text = escape(text.rstrip())
 
-    return text
+    if additions:
+        return escaped_text + "\n\n" + "\n".join(additions)
+
+    return escaped_text
 
 
 def send_message(message):
@@ -89,7 +91,8 @@ def send_message(message):
     payload = {
         "chat_id": CHAT_ID,
         "text": message,
-        "parse_mode": "Markdown",
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True,
     }
 
     response = requests.post(
@@ -97,11 +100,9 @@ def send_message(message):
         json=payload,
         timeout=30,
     )
-
     response.raise_for_status()
 
     result = response.json()
-
     if not result.get("ok"):
         raise RuntimeError(f"Telegram API error: {result}")
 
@@ -110,6 +111,8 @@ def main():
     text = read_text_file()
     flags = read_flags()
 
+    print(f"Text URL: {TXT_URL}")
+    print(f"Flags URL: {XLSX_URL}")
     print(f"Flags: {flags}")
 
     message = build_message(text, flags)
